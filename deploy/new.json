@@ -1,0 +1,265 @@
+{
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "When_a_resource_event_occurs": {
+          "type": "ApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azureeventgrid-1']['connectionId']"
+              }
+            },
+            "body": {
+              "properties": {
+                "topic": "/subscriptions/c9820bad-e336-46a9-be52-4b863d69bfac/resourceGroups/rg-uks-prd-uktl-vmwr-exprt-01/providers/Microsoft.Storage/storageAccounts/sauploadvmwr01",
+                "destination": {
+                  "endpointType": "webhook",
+                  "properties": {
+                    "endpointUrl": "@listCallbackUrl()"
+                  }
+                },
+                "filter": {
+                  "includedEventTypes": [
+                    "Microsoft.Storage.BlobCreated"
+                  ]
+                }
+              }
+            },
+            "path": "/subscriptions/@{encodeURIComponent('Platform')}/providers/@{encodeURIComponent('Microsoft.Storage.StorageAccounts')}/resource/eventSubscriptions",
+            "queries": {
+              "x-ms-api-version": "2017-09-15-preview"
+            }
+          },
+          "splitOn": "@triggerBody()"
+        }
+      },
+      "actions": {
+        "Parse_JSON": {
+          "type": "ParseJson",
+          "inputs": {
+            "content": "@triggerBody()",
+            "schema": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "api": {
+                      "type": "string"
+                    },
+                    "blobType": {
+                      "type": "string"
+                    },
+                    "blobUrl": {
+                      "type": "string"
+                    },
+                    "clientRequestId": {
+                      "type": "string"
+                    },
+                    "contentLength": {
+                      "type": "integer"
+                    },
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "eTag": {
+                      "type": "string"
+                    },
+                    "identity": {
+                      "type": "string"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "sequencer": {
+                      "type": "string"
+                    },
+                    "storageDiagnostics": {
+                      "properties": {
+                        "batchId": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "dataVersion": {
+                  "type": "string"
+                },
+                "eventTime": {
+                  "type": "string"
+                },
+                "eventType": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "metadataVersion": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "topic": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "runAfter": {}
+        },
+        "Initialize_variable": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "blobURL",
+                "type": "string",
+                "value": "@body('Parse_JSON')?['data']?['blobUrl']"
+              }
+            ]
+          },
+          "runAfter": {
+            "Parse_JSON": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Initialize_variable_1": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "blobName",
+                "type": "string",
+                "value": "@last(split(variables('blobURL'), '/upload/'))"
+              }
+            ]
+          },
+          "runAfter": {
+            "Initialize_variable": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Initialize_variable_2": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "utc_fileName",
+                "type": "string"
+              }
+            ]
+          },
+          "runAfter": {
+            "Initialize_variable_1": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Trigger_upload_to_approval_runbook": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+              }
+            },
+            "method": "put",
+            "body": {
+              "properties": {
+                "parameters": {
+                  "filename": "@variables('blobName')"
+                }
+              }
+            },
+            "path": "/subscriptions/@{encodeURIComponent('c9820bad-e336-46a9-be52-4b863d69bfac')}/resourceGroups/@{encodeURIComponent('rg-uks-prd-uktl-vmwr-exprt-01')}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent('aut-uks-prd-uktl-vmwr-01')}/jobs",
+            "queries": {
+              "x-ms-api-version": "2015-10-31",
+              "runbookName": "uploadToApproval",
+              "wait": true
+            }
+          },
+          "runAfter": {
+            "Initialize_variable_2": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_status_of_job": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/subscriptions/@{encodeURIComponent('c9820bad-e336-46a9-be52-4b863d69bfac')}/resourceGroups/@{encodeURIComponent('rg-uks-prd-uktl-vmwr-exprt-01')}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent('aut-uks-prd-uktl-vmwr-01')}/jobs/@{encodeURIComponent(body('Trigger_upload_to_approval_runbook')?['properties']?['jobId'])}",
+            "queries": {
+              "x-ms-api-version": "2015-10-31"
+            }
+          },
+          "runAfter": {
+            "Trigger_upload_to_approval_runbook": [
+              "SUCCEEDED"
+            ]
+          }
+        },
+        "Get_job_output": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/subscriptions/@{encodeURIComponent('c9820bad-e336-46a9-be52-4b863d69bfac')}/resourceGroups/@{encodeURIComponent('rg-uks-prd-uktl-vmwr-exprt-01')}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent('aut-uks-prd-uktl-vmwr-01')}/jobs/@{encodeURIComponent(body('Get_status_of_job')?['properties']?['jobId'])}/output",
+            "queries": {
+              "x-ms-api-version": "2015-10-31"
+            }
+          },
+          "runAfter": {
+            "Get_status_of_job": [
+              "SUCCEEDED"
+            ]
+          }
+        }
+      },
+      "outputs": {},
+      "parameters": {
+        "": {
+          "type": "Array"
+        },
+        "$connections": {
+          "type": "Object",
+          "defaultValue": {}
+        }
+      }
+    },
+    "parameters": {
+      "$connections": {
+        "value": {
+          "azureeventgrid-1": {
+            "id": "/subscriptions/c9820bad-e336-46a9-be52-4b863d69bfac/providers/Microsoft.Web/locations/uksouth/managedApis/azureeventgrid",
+            "connectionId": "/subscriptions/c9820bad-e336-46a9-be52-4b863d69bfac/resourceGroups/rg-uks-prd-uktl-vmwr-exprt-01/providers/Microsoft.Web/connections/azureeventgrid-1",
+            "connectionName": "azureeventgrid-1"
+          },
+          "azureautomation-1": {
+            "id": "/subscriptions/c9820bad-e336-46a9-be52-4b863d69bfac/providers/Microsoft.Web/locations/uksouth/managedApis/azureautomation",
+            "connectionId": "/subscriptions/c9820bad-e336-46a9-be52-4b863d69bfac/resourceGroups/rg-uks-prd-uktl-vmwr-exprt-01/providers/Microsoft.Web/connections/azureautomation-1",
+            "connectionName": "azureautomation-1"
+          }
+        }
+      }
+    }
+  }
