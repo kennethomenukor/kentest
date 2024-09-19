@@ -6,6 +6,12 @@ param appServiceAppName string
 
 param appServicePlanName string
 
+@description('The name of the storage account to deploy. This name must be globally unique.')
+param storageAccountName string
+
+@description('The name of the queue to deploy for processing orders.')
+param processOrderQueueName string
+
 @description('The type of the environment. This must be nonprod or prod.')
 @allowed([
   'nonprod'
@@ -28,5 +34,17 @@ resource appServiceApp 'Microsoft.Web/sites@2022-03-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    siteConfig: {
+      appSettings: [
+        { 
+          name: 'kentest-${uniqueString(resourceGroup().id)}-sa1'
+          value: storageAccountName
+        }
+        { 
+          name: 'processorder'
+          value: processOrderQueueName
+        }
+      ]
+    }
   }
 }
