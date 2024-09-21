@@ -5,6 +5,7 @@ param storageAccountName string = 'kentest-${uniqueString(resourceGroup().id)}-s
 @allowed ([
   'prod'
   'nonprod'
+  'test'
 ])
 param environmentType string
 
