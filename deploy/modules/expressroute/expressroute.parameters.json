@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "p_location": {
+      "value": "uksouth"
+    },
+    "p_rsg_expressRouteCircuit_name": {
+      "value": "rg-uks-prd-uktl-hub-ergw-01"
+    },
+    "p_tags": {
+      "value": {
+        "environment": "prd",
+        "DeployedBy": "Kenneth_Omenukor"
+      }
+    },
+    "p_expressRouteCircuit": {
+      "value": [
+        {
+          "name": "vgw-uks-prd-uktl-ergw-02",
+          "sku": {
+            "name": "Standard_MeteredData",
+            "tier": "Standard",
+            "family": "MeteredData"
+          },
+          "properties": {
+            "serviceProviderProperties": {
+              "serviceProviderName": "Telehouse - KDDI",
+              "peeringLocation": "London2",
+              "bandwidthInMbps": 1000
+            },
+            "circuitProvisioningState": "Enabled",
+            "allowClassicOperations": false
+          }
+        }
+      ]
+    }
+  }
+}
